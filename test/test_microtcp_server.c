@@ -22,9 +22,34 @@
  * You can use this file to write a test microTCP server.
  * This file is already inserted at the build system.
  */
+#include <../lib/microtcp.h>
 
-int
-main(int argc, char **argv)
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+int main()
 {
+    microtcp_sock_t sock;
+    struct sockaddr_in sin;
+    int port = 9090;
 
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr_len);
+
+    sock = microtcp_socket(AF_INET, SOCK_DGRAM, 0);
+
+    memset(&sin, 0, sizeof(struct sockaddr_in));
+    sin.sin_family = AF_INET;
+    sin.sin_port = htons(port);
+    sin.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    microtcp_bind(&sock, (struct sockaddr *)&sin, sizeof(struct sockaddr_in));
+
+    client_addr_len = sizeof(struct sockaddr);
+    microtcp_accept(&sock, (struct sockaddr *)&client_addr, client_addr_len);
 }
