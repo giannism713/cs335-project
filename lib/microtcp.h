@@ -24,6 +24,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <time.h>
 
 /*
  * Several useful constants
@@ -34,6 +36,7 @@
 #define MICROTCP_WIN_SIZE MICROTCP_RECVBUF_LEN
 #define MICROTCP_INIT_CWND (3 * MICROTCP_MSS)
 #define MICROTCP_INIT_SSTHRESH MICROTCP_WIN_SIZE
+
 
 /**
  * Possible states of the microTCP socket
