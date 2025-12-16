@@ -88,7 +88,7 @@ typedef struct
     // Additional fields
     struct sockaddr* dest_address;
     socklen_t dests_address_len;
-
+    int client_or_server; // Client is 0, server is 1
 } microtcp_sock_t;
 
 /**

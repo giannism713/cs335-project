@@ -52,4 +52,8 @@ int main()
 
     client_addr_len = sizeof(struct sockaddr);
     microtcp_accept(&sock, (struct sockaddr *)&client_addr, client_addr_len);
+
+    // Now send shutdown
+    microtcp_shutdown(&sock, 0);
+    printf("[Server] Shutdown OK!\n");
 }
