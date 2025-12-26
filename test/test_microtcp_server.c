@@ -53,6 +53,15 @@ int main()
     client_addr_len = sizeof(struct sockaddr);
     microtcp_accept(&sock, (struct sockaddr *)&client_addr, client_addr_len);
 
+    // Allocate the buffer
+    void *buffer_to_store;
+    int size = 10000;
+    buffer_to_store = malloc(size);
+    microtcp_recv(&sock, buffer_to_store, size, 0);
+
+    fwrite(buffer_to_store, 1, size, stdout);
+    fflush(stdout);
+
     // Now send shutdown
     microtcp_shutdown(&sock, 0);
     printf("[Server] Shutdown OK!\n");

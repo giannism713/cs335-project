@@ -25,6 +25,7 @@
 #include <../lib/microtcp.h>
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -59,8 +60,36 @@ int main()
     client_addr_len = sizeof(struct sockaddr);
     microtcp_connect(&sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr));
 
+    // Send something
+    FILE *file_ptr = fopen("test.txt", "rb");
+    if (!file_ptr)
+    {
+        printf("File didn't open\n");
+        return -1;
+    }
+    fseek(file_ptr, 0, SEEK_END);
+    long size = ftell(file_ptr);
+    rewind(file_ptr);
 
 
+    void *buffer = malloc(size);
+    int bytes_read = fread(buffer, 1, size, file_ptr);
+    if (bytes_read != size)
+    {
+        perror("fread");
+        printf("errno = %d\n", errno);
+
+        free(buffer);
+        fclose(file_ptr);
+        return -1;
+    }
+
+    fwrite(buffer, 1, size, stdout);
+    fflush(stdout);
+
+    microtcp_send(&sock, buffer, size, 0);
+
+    printf("hello\n");
     // Now send shutdown
     microtcp_shutdown(&sock, 0);
     printf("[Client] Shutdown OK!\n");

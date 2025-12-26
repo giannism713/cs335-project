@@ -28,6 +28,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <time.h>
+#include <sys/time.h>
+
 /*
  * Several useful constants
  */
@@ -51,6 +53,9 @@ typedef enum
     CLOSING_BY_PEER,
     CLOSING_BY_HOST,
     CLOSED,
+    FAST_RECOVERY,
+    SLOW_START,
+    CONGESTION_AVOIDANCE,
     INVALID
 } mircotcp_state_t;
 
@@ -89,6 +94,8 @@ typedef struct
     struct sockaddr* dest_address;
     socklen_t dests_address_len;
     int client_or_server; // Client is 0, server is 1
+    int dup_acks_count;
+    int last_received_ack;
 } microtcp_sock_t;
 
 /**
