@@ -39,7 +39,7 @@ int main()
     int port = 9090;
 
     struct sockaddr_in client_addr;
-    socklen_t client_addr_len = sizeof(client_addr_len);
+    socklen_t client_addr_len = sizeof(client_addr);
 
     sock = microtcp_socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -55,14 +55,30 @@ int main()
 
     // Allocate the buffer
     void *buffer_to_store;
-    int size = 10000;
+    int size = 10000000;
     buffer_to_store = malloc(size);
-    microtcp_recv(&sock, buffer_to_store, size, 0);
+    size_t total_bytes = 0;
 
-    fwrite(buffer_to_store, 1, size, stdout);
+    ssize_t received_bytes;
+    void *buffer_receive = malloc(MICROTCP_RECVBUF_LEN);
+    while ((received_bytes = microtcp_recv(&sock, buffer_receive, MICROTCP_RECVBUF_LEN, 0))>0)
+    {
+        
+        if (total_bytes + received_bytes > size)
+        {
+            fprintf(stderr, "Buffer overflow\n");
+            buffer_to_store = realloc(buffer_to_store, 2*size);
+            size *=2;
+        }
+
+        memcpy((uint8_t *)buffer_to_store + total_bytes, buffer_receive, received_bytes);
+
+        total_bytes += received_bytes;
+    }
+
+    fwrite(buffer_to_store, 1, total_bytes, stdout);
     fflush(stdout);
 
     // Now send shutdown
-    microtcp_shutdown(&sock, 0);
     printf("[Server] Shutdown OK!\n");
 }

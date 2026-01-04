@@ -67,6 +67,7 @@ int main()
         printf("File didn't open\n");
         return -1;
     }
+
     fseek(file_ptr, 0, SEEK_END);
     long size = ftell(file_ptr);
     rewind(file_ptr);
@@ -88,8 +89,7 @@ int main()
     fflush(stdout);
 
     microtcp_send(&sock, buffer, size, 0);
-
-    printf("hello\n");
+    
     // Now send shutdown
     microtcp_shutdown(&sock, 0);
     printf("[Client] Shutdown OK!\n");

@@ -44,16 +44,6 @@ microtcp_sock_t microtcp_socket(int domain, int type, int protocol)
         exit(EXIT_FAILURE);
     }
 
-    // // Set timeout
-    // struct timeval timeout;
-    // timeout.tv_sec = 0;
-    // timeout.tv_usec = MICROTCP_ACK_TIMEOUT_US;
-    // if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
-    // {
-    //     perror("[ERROR] SOCKET COULND'T HANDLE TIMEOUT\n");
-    //     exit(EXIT_FAILURE);
-    // }
-
     microtcp_sock_t opened_socket;
     memset(&opened_socket, 0, sizeof(opened_socket));
     opened_socket.sd = sock;
@@ -75,6 +65,15 @@ int microtcp_bind(microtcp_sock_t *socket, const struct sockaddr *address, sockl
 // Initiates the connection with the receiver
 int microtcp_connect(microtcp_sock_t *socket, const struct sockaddr *address, socklen_t address_len)
 {
+    // Set timeout
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = MICROTCP_ACK_TIMEOUT_US;
+    if (setsockopt(socket->sd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
+    {
+        perror("[ERROR] SOCKET COULND'T HANDLE TIMEOUT\n");
+        exit(EXIT_FAILURE);
+    }
 
     srand(time(NULL));
     // First create the packet header
@@ -110,7 +109,7 @@ int microtcp_connect(microtcp_sock_t *socket, const struct sockaddr *address, so
     socket->last_received_ack = 0;
 
     // Now send the header to the receiver
-    if (sendto(socket->sd, &header_syn, sizeof(header_syn), 0, address, address_len) < sizeof(header_syn))
+    if (sendto(socket->sd, &header_syn, sizeof(header_syn), 0, address, address_len) < (ssize_t)sizeof(header_syn))
     {
         printf("[ERROR microtcp_connect] sendto sent less bytes than it should\n");
     }
@@ -125,7 +124,6 @@ int microtcp_connect(microtcp_sock_t *socket, const struct sockaddr *address, so
         printf("[ERROR microtcp_connect] ACK number received is not correct\n");
     }
     uint16_t correct_sum = (1 << 12) + (1 << 14);
-    printf("correct sum is %d\n", correct_sum);
     if (!((header_received.control & (1 << 14)) && (header_received.control & (1 << 12))))
     {
         printf("[ERROR microtcp_connect] Not received SYN+ACK\n");
@@ -164,7 +162,7 @@ int microtcp_connect(microtcp_sock_t *socket, const struct sockaddr *address, so
     socket->dest_address = address;
     socket->dests_address_len = address_len;
     // Now send the header to the receiver
-    if (sendto(socket->sd, &header_ack, sizeof(microtcp_header_t), 0, address, address_len) < sizeof(header_ack))
+    if (sendto(socket->sd, &header_ack, sizeof(microtcp_header_t), 0, address, address_len) < (ssize_t)sizeof(header_ack))
     {
         printf("[ERROR microtcp_connect] sendto ACK sent less bytes than it "
                "should\n");
@@ -180,7 +178,6 @@ int microtcp_accept(microtcp_sock_t *socket, struct sockaddr *address, socklen_t
     ssize_t bytes_received = recvfrom(socket->sd, &header_received, sizeof(header_received), 0, address, &address_len);
     // Check correctness of received
     uint16_t correct_sum = (1 << 14);
-    printf("correct sum is %d\n", correct_sum);
     if (!(header_received.control & (1 << 14)))
     {
         printf("[ERROR microtcp_accept] Not received SYN\n");
@@ -227,7 +224,7 @@ int microtcp_accept(microtcp_sock_t *socket, struct sockaddr *address, socklen_t
     header_syn_ack.checksum = 0;
     header_syn_ack.checksum = crc32((const uint8_t *)&header_syn_ack, sizeof(header_syn_ack));
 
-    if (sendto(socket->sd, &header_syn_ack, sizeof(header_syn_ack), 0, address, address_len) < sizeof(header_syn_ack))
+    if (sendto(socket->sd, &header_syn_ack, sizeof(header_syn_ack), 0, address, address_len) < (ssize_t)sizeof(header_syn_ack))
     {
         printf("[ERROR microtcp_connect] sendto SYNACK sent less bytes than it "
                "should\n");
@@ -245,7 +242,6 @@ int microtcp_accept(microtcp_sock_t *socket, struct sockaddr *address, socklen_t
     }
 
     correct_sum = (1 << 12);
-    printf("correct sum is %d\n", correct_sum);
     if (!((header_received_2.control & (1 << 12))))
     {
         printf("[ERROR microtcp_accept] Not received SYN+ACK\n");
@@ -290,7 +286,7 @@ int microtcp_shutdown(microtcp_sock_t *socket, int how)
         header_fin_ack.checksum = 0;
         header_fin_ack.checksum = crc32((const uint8_t *)&header_fin_ack, sizeof(header_fin_ack));
 
-        if (sendto(socket->sd, &header_fin_ack, sizeof(header_fin_ack), 0, socket->dest_address, socket->dests_address_len) < sizeof(header_fin_ack))
+        if (sendto(socket->sd, &header_fin_ack, sizeof(header_fin_ack), 0, socket->dest_address, socket->dests_address_len) < (ssize_t)sizeof(header_fin_ack))
         {
             printf("[ERROR microtcp_shutdown] sendto FINACK sent less bytes than it "
                    "should\n");
@@ -302,7 +298,6 @@ int microtcp_shutdown(microtcp_sock_t *socket, int how)
 
         // Check correctness of received
         uint16_t correct_sum = (1 << 12);
-        printf("correct sum is %d\n", correct_sum);
         if (!(header_received.control & (1 << 12)))
         {
             printf("[ERROR microtcp_shutdown] Not received ACK\n");
@@ -325,7 +320,6 @@ int microtcp_shutdown(microtcp_sock_t *socket, int how)
 
         // Check correctness of received
         correct_sum = (1 << 12) | (1 << 15);
-        printf("correct sum is %d\n", correct_sum);
         if (!((header_received.control & (1 << 15)) && (header_received.control & (1 << 12))))
         {
             printf("[ERROR microtcp_shutdown] Not received FIN ACK (2)\n");
@@ -359,7 +353,7 @@ int microtcp_shutdown(microtcp_sock_t *socket, int how)
         header_ack.checksum = 0;
         header_ack.checksum = crc32((const uint8_t *)&header_ack, sizeof(header_ack));
 
-        if (sendto(socket->sd, &header_ack, sizeof(header_ack), 0, socket->dest_address, socket->dests_address_len) < sizeof(header_ack))
+        if (sendto(socket->sd, &header_ack, sizeof(header_ack), 0, socket->dest_address, socket->dests_address_len) < (ssize_t)sizeof(header_ack))
         {
             printf("[ERROR microtcp_shutdown] sendto ACK sent less bytes than it "
                    "should\n");
@@ -370,32 +364,12 @@ int microtcp_shutdown(microtcp_sock_t *socket, int how)
     else // If server
     {
         microtcp_header_t header_received; // We wait to receive FIN ACK again from client
-        ssize_t bytes_received = recvfrom(socket->sd, &header_received, sizeof(header_received), 0, socket->dest_address, &socket->dests_address_len);
-
-        // Check correctness of received
-        uint16_t correct_sum = (1 << 12) | (1 << 15);
-        printf("correct sum is %d\n", correct_sum);
-        if (!((header_received.control & (1 << 15)) && (header_received.control & (1 << 12))))
-        {
-            printf("[ERROR microtcp_shutdown] Not received FIN ACK (2)\n");
-        }
-        else if (correct_sum != header_received.control)
-        {
-            printf("[ERROR microtcp_shutdown] Wrong bits on control (2)\n");
-        }
-        uint32_t checksum_assigned_on_header_received = header_received.checksum;
-        header_received.checksum = 0;
-        if (checksum_assigned_on_header_received != crc32((const uint8_t *)&header_received, sizeof(header_received)))
-        {
-            printf("[ERROR microtcp_shutdown] Checksum is wrong (2)\n");
-        }
-        socket->packets_received++;
-        socket->state = CLOSING_BY_PEER;
+        ssize_t bytes_received = 0;
 
         // Resend ACK now
         microtcp_header_t header_ack;
         socket->seq_number++;
-        socket->ack_number = header_received.seq_number + 1;
+        socket->ack_number = socket->seq_number + 1;
 
         header_ack.seq_number = socket->seq_number;
         header_ack.ack_number = socket->ack_number;
@@ -408,7 +382,7 @@ int microtcp_shutdown(microtcp_sock_t *socket, int how)
         header_ack.checksum = 0;
         header_ack.checksum = crc32((const uint8_t *)&header_ack, sizeof(header_ack));
 
-        if (sendto(socket->sd, &header_ack, sizeof(header_ack), 0, socket->dest_address, socket->dests_address_len) < sizeof(header_ack))
+        if (sendto(socket->sd, &header_ack, sizeof(header_ack), 0, socket->dest_address, socket->dests_address_len) < (ssize_t)sizeof(header_ack))
         {
             printf("[ERROR microtcp_shutdown] sendto ACK sent less bytes than it "
                    "should\n");
@@ -432,7 +406,7 @@ int microtcp_shutdown(microtcp_sock_t *socket, int how)
         header_fin_ack.checksum = crc32((const uint8_t *)&header_fin_ack, sizeof(header_fin_ack));
 
         // Send FIN ACK back for client to close too
-        if (sendto(socket->sd, &header_fin_ack, sizeof(header_fin_ack), 0, socket->dest_address, socket->dests_address_len) < sizeof(header_fin_ack))
+        if (sendto(socket->sd, &header_fin_ack, sizeof(header_fin_ack), 0, socket->dest_address, socket->dests_address_len) < (ssize_t)sizeof(header_fin_ack))
         {
             printf("[ERROR microtcp_shutdown] sendto FINACK sent less bytes than it "
                    "should\n");
@@ -443,8 +417,7 @@ int microtcp_shutdown(microtcp_sock_t *socket, int how)
         bytes_received = recvfrom(socket->sd, &header_received, sizeof(header_received), 0, socket->dest_address, &socket->dests_address_len);
 
         // Check correctness of received
-        correct_sum = (1 << 12);
-        printf("correct sum is %d\n", correct_sum);
+        int correct_sum = (1 << 12);
         if (!(header_received.control & (1 << 12)))
         {
             printf("[ERROR microtcp_shutdown] Not received ACK\n");
@@ -453,7 +426,7 @@ int microtcp_shutdown(microtcp_sock_t *socket, int how)
         {
             printf("[ERROR microtcp_shutdown] Wrong bits on control\n");
         }
-        checksum_assigned_on_header_received = header_received.checksum;
+        uint32_t checksum_assigned_on_header_received = header_received.checksum;
         header_received.checksum = 0;
         if (checksum_assigned_on_header_received != crc32((const uint8_t *)&header_received, sizeof(header_received)))
         {
@@ -472,7 +445,7 @@ ssize_t microtcp_send(microtcp_sock_t *socket, const void *buffer, size_t length
 
     int first_seq_number = -1;
 
-    while (data_sent < length)
+    while (data_sent < (ssize_t)length)
     {
         ssize_t bytes_to_send = min3(socket->cwnd, remaining, socket->curr_win_size);
         ssize_t chunks = bytes_to_send / MICROTCP_MSS; // check this
@@ -494,21 +467,17 @@ ssize_t microtcp_send(microtcp_sock_t *socket, const void *buffer, size_t length
             header_message->future_use2 = 0;
             header_message->checksum = 0;
 
-            // Update the socket
-            // socket->curr_win_size = MICROTCP_WIN_SIZE;
-            // socket->cwnd = MICROTCP_INIT_CWND;         // check
-            // socket->ssthresh = MICROTCP_INIT_SSTHRESH; // check
             socket->seq_number = header_message->seq_number + header_message->data_len;
-            // socket->ack_number = socket->ack_number + header_message->data_len;
             socket->packets_send++;
             socket->bytes_send = socket->bytes_send + header_message->data_len;
 
             memcpy((uint8_t *)header_message + sizeof(microtcp_header_t), (const uint8_t *)buffer + data_sent, MICROTCP_MSS);
+            data_sent += MICROTCP_MSS;
 
             header_message->checksum = crc32((const uint8_t *)header_message, sizeof(microtcp_header_t) + MICROTCP_MSS);
 
-            printf("sends a packet with seq_number: %d and ack_number: %d and data_len is %d\n", header_message->seq_number, header_message->ack_number, header_message->data_len);
-            if (sendto(socket->sd, header_message, sizeof(microtcp_header_t) + MICROTCP_MSS, 0, socket->dest_address, socket->dests_address_len) < sizeof(header_message))
+            printf("[microtcp_send] Sends a packet with seq_number: %d and ack_number: %d and data_len is %d\n", header_message->seq_number, header_message->ack_number, header_message->data_len);
+            if (sendto(socket->sd, header_message, sizeof(microtcp_header_t) + MICROTCP_MSS, 0, socket->dest_address, socket->dests_address_len) < (ssize_t)sizeof(header_message))
             {
                 printf("[ERROR microtcp_send] sendto SEND sent less bytes than it should\n");
                 free(header_message);
@@ -537,18 +506,16 @@ ssize_t microtcp_send(microtcp_sock_t *socket, const void *buffer, size_t length
 
             // Update the socket
             socket->seq_number = header_message->seq_number;
-            // socket->ack_number = socket->ack_number + header_message->data_len;
             socket->packets_send++;
             socket->bytes_send = socket->bytes_send + header_message->data_len;
 
             memcpy((uint8_t *)header_message + sizeof(microtcp_header_t), (const uint8_t *)buffer + data_sent, (bytes_to_send % MICROTCP_MSS));
-
-            // fwrite((uint8_t *)buffer + data_sent, 1, (bytes_to_send % MICROTCP_MSS), stdout);
+            data_sent += bytes_to_send % MICROTCP_MSS;
 
             header_message->checksum = crc32((const uint8_t *)header_message, sizeof(microtcp_header_t) + (bytes_to_send % MICROTCP_MSS));
-            printf("sends a packet with seq_number: %d and ack_number: %d and data_len is %d\n", header_message->seq_number, header_message->ack_number, header_message->data_len);
+            printf("[microtcp_send] Sends a packet with seq_number: %d and ack_number: %d and data_len is %d\n", header_message->seq_number, header_message->ack_number, header_message->data_len);
 
-            if (sendto(socket->sd, header_message, sizeof(microtcp_header_t) + MICROTCP_MSS, 0, socket->dest_address, socket->dests_address_len) < sizeof(header_message))
+            if (sendto(socket->sd, header_message, sizeof(microtcp_header_t) + MICROTCP_MSS, 0, socket->dest_address, socket->dests_address_len) < (ssize_t)sizeof(header_message))
             {
                 printf("[ERROR microtcp_send] sendto SEND sent less bytes than it should\n");
                 free(header_message);
@@ -585,7 +552,6 @@ ssize_t microtcp_send(microtcp_sock_t *socket, const void *buffer, size_t length
                 {
                     // Enable 3 dup acks count mechanism fast recovery
                     socket->state = FAST_RECOVERY;
-                    //...
                     remaining -= (socket->last_received_ack - first_seq_number);
                     data_sent += (socket->last_received_ack - first_seq_number);
                     socket->packets_lost++;
@@ -607,7 +573,7 @@ ssize_t microtcp_send(microtcp_sock_t *socket, const void *buffer, size_t length
                 }
             }
             // Update cwnd if we have received plain acks... etc...
-            if (socket->state == CONGESTION_AVOIDANCE && !have_received_dup_ack_flag)
+            if (socket->state == CONGESTION_AVOIDANCE && !have_received_dup_ack_flag) data_sent += bytes_to_send;
             {
                 socket->cwnd += MICROTCP_MSS * (MICROTCP_MSS / socket->cwnd);
                 socket->dup_acks_count = 0;
@@ -630,22 +596,19 @@ ssize_t microtcp_send(microtcp_sock_t *socket, const void *buffer, size_t length
         if (socket->state != FAST_RECOVERY)
         {
             remaining -= bytes_to_send;
-            data_sent += bytes_to_send;
         }
     }
-
-    printf("SEND TO OKEY\n");
     return 0;
 }
 
 ssize_t microtcp_recv(microtcp_sock_t *socket, void *buffer, size_t length, int flags)
 {
 
+    if(socket->state == CLOSED) return 0;
     while (1)
     {
         uint8_t packet[sizeof(microtcp_header_t) + MICROTCP_MSS];
         ssize_t bytes_received = recvfrom(socket->sd, packet, sizeof(packet), 0, socket->dest_address, &socket->dests_address_len);
-        printf("expects a packet has seq_number: %d and ack_number: %d\n", socket->seq_number, socket->ack_number);
 
         uint8_t *payload = packet + sizeof(microtcp_header_t);
 
@@ -654,41 +617,21 @@ ssize_t microtcp_recv(microtcp_sock_t *socket, void *buffer, size_t length, int 
         if (((header_received->control & (1 << 15)) && (header_received->control & (1 << 12))))
         {
             // Check correctness of received
-            int correct_sum = (1 << 12) | (1 << 15);
-            printf("correct sum is %d\n", correct_sum);
-            // if (!((header_received.control & (1 << 15)) && (header_received.control & (1 << 12))))
-            // {
-            //     printf("[ERROR microtcp_recv] Not received FIN ACK\n");
-            // }
-            // if (correct_sum != header_received.control)
-            // {
-            //     printf("[ERROR microtcp_recv] Wrong bits on control\n");
-            // }
-            uint32_t checksum_assigned_on_header_received = header_received->checksum;
-            header_received->checksum = 0;
-            if (checksum_assigned_on_header_received != crc32((const uint8_t *)&header_received, sizeof(header_received)))
-            {
-                printf("[ERROR microtcp_recv] Checksum is wrong\n");
-                return 0;
-            }
             socket->packets_received++;
             socket->state = CLOSING_BY_PEER;
+
+            printf("[microtcp_recv] received FIN ACK shutdown code\n");
             microtcp_shutdown(socket, 0);
 
-            printf("[ERROR microtcp_recv] received FIN ACK and executed shutdown code\n");
+            return socket->buf_fill_level;
         }
         else
         {
             // Check numbers
             if (socket->ack_number != header_received->seq_number)
             {
-                printf("we wait for %d and receive %d\n", socket->ack_number, header_received->seq_number);
 
                 printf("[ERROR microtcp_recv] seq_number received is wrong\n");
-
-                // Update the socket
-                // socket->ack_number = header_received.seq_number + header_received.data_len;
-
                 // Send one of the 3 dup acks now
                 // Create the ACK header
                 microtcp_header_t header_message;
@@ -705,31 +648,30 @@ ssize_t microtcp_recv(microtcp_sock_t *socket, void *buffer, size_t length, int 
                 socket->seq_number += 1;
                 socket->packets_send++;
 
-                if (sendto(socket->sd, &header_message, sizeof(header_message), 0, socket->dest_address, socket->dests_address_len) < sizeof(header_message))
+                if (sendto(socket->sd, &header_message, sizeof(header_message), 0, socket->dest_address, socket->dests_address_len) < (ssize_t)sizeof(header_message))
                 {
                     printf("[ERROR microtcp_recv] sendto SEND sent less bytes than it should\n");
                     return -1;
                 }
-                // return 0;
             }
             else // Everything went OK
             {
                 // ACK number is correct
                 // Copy the message only the data
-                socket->buf_fill_level += header_received->data_len;
+            
                 memcpy((uint8_t *)buffer + socket->buf_fill_level, payload, header_received->data_len);
-                socket->curr_win_size = socket->buf_fill_level;
 
-                // printf("%d sockbufffilllevel\n", header_received->data_len);
-                // fwrite((uint8_t *)buffer, 1, header_received->data_len, stdout);
+                socket->buf_fill_level += header_received->data_len;
+                socket->curr_win_size = MICROTCP_RECVBUF_LEN - socket->buf_fill_level;
 
-                // printf("%s\n", &header_received + sizeof(microtcp_header_t));
-                // Send back the ACK of the message received
+                // Update the socket
+                socket->ack_number = header_received->seq_number + header_received->data_len;
+                socket->seq_number += 1;
 
                 // Create the ACK header
                 microtcp_header_t header_message;
                 header_message.seq_number = socket->seq_number;
-                header_message.ack_number = socket->ack_number; // Check
+                header_message.ack_number = socket->ack_number;
                 header_message.control = 1 << 12;
                 header_message.data_len = 0;
                 header_message.future_use0 = 0;
@@ -738,19 +680,22 @@ ssize_t microtcp_recv(microtcp_sock_t *socket, void *buffer, size_t length, int 
                 header_message.checksum = 0;
                 header_message.window = socket->curr_win_size;
 
-                // Update the socket
-                socket->ack_number = header_received->seq_number + header_received->data_len;
-                socket->seq_number += 1;
                 header_message.checksum = crc32((const uint8_t *)&header_message, sizeof(microtcp_header_t));
 
-                if (sendto(socket->sd, &header_message, sizeof(header_message), 0, socket->dest_address, socket->dests_address_len) < sizeof(header_message))
+                printf("Sends ack number %d\n", header_message.ack_number);
+
+                if (sendto(socket->sd, &header_message, sizeof(header_message), 0, socket->dest_address, socket->dests_address_len) < (ssize_t)sizeof(header_message))
                 {
                     printf("[ERROR microtcp_recv] sendto SEND sent less bytes than it should\n");
                     return -1;
                 }
 
-                printf("RECEIVE FROM EVERYTHING OKEY\n");
-                // return 0;
+                if (socket->buf_fill_level + MICROTCP_MSS >= MICROTCP_RECVBUF_LEN)
+                {
+                    int temp = socket->buf_fill_level;
+                    socket->buf_fill_level = 0;
+                    return temp;
+                }
             }
         }
     }
