@@ -573,7 +573,7 @@ ssize_t microtcp_send(microtcp_sock_t *socket, const void *buffer, size_t length
                 }
             }
             // Update cwnd if we have received plain acks... etc...
-            if (socket->state == CONGESTION_AVOIDANCE && !have_received_dup_ack_flag) data_sent += bytes_to_send;
+            if (socket->state == CONGESTION_AVOIDANCE && !have_received_dup_ack_flag)
             {
                 socket->cwnd += MICROTCP_MSS * (MICROTCP_MSS / socket->cwnd);
                 socket->dup_acks_count = 0;
